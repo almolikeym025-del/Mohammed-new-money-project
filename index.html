@@ -207,6 +207,16 @@ if(bal>0) balanceBox.style.color='#2e7d32';
 else if(bal<0) balanceBox.style.color='#c62828';
 else balanceBox.style.color='#000';
 }
+/* ===== تحرير وحذف العمليات ===== */
+function editTransaction(i){
+const t = transactions[i];
+const newDesc = prompt("تعديل الوصف:", t.desc);
+if(newDesc!==null) t.desc=newDesc;
+const newAmount = prompt("تعديل المبلغ:", t.amount);
+if(newAmount!==null && !isNaN(newAmount)) t.amount=+newAmount;
+localStorage.setItem('financeData',JSON.stringify(transactions));
+renderTransactions();
+}
 
 /* ===== حفظ ===== */
 function saveTransactions(){
