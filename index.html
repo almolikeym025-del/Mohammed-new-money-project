@@ -63,8 +63,7 @@ th{background:#f5f5f5}
 
 <div class="card warning">
 <h4>تصفية وترحيل المصروفات والدخل</h4>
-<p>يمكنك ترحيل العمليات الشهرية تلقائيًا أو لحظيًا يدويًا.</p>
-<button onclick="closeMonth()">ترحيل الشهر</button>
+<p>يمكنك ترحيل العمليات لحظيًا يدويًا. الترحيل الشهري يتم تلقائيًا في بداية كل شهر جديد.</p>
 <button onclick="instantClear()">ترحيل لحظي</button>
 </div>
 
@@ -267,42 +266,6 @@ if(payAmount!==null && !isNaN(payAmount)){
     saveTransactions();
     renderDebts();
 }
-}
-
-/* ===== ترحيل الشهر ===== */
-function closeMonth(){
-if(transactions.length===0) return;
-const now = new Date();
-const m = now.getMonth()+1;
-const y = now.getFullYear();
-
-const monthTransactions = [...transactions];
-let totalIncomeMonth=0, totalExpenseMonth=0;
-monthTransactions.forEach(t=>{
-if(t.type==='income') totalIncomeMonth+=t.amount;
-else totalExpenseMonth+=t.amount;
-});
-
-const diff = totalIncomeMonth - totalExpenseMonth;
-
-archiveData.push({month:m,year:y,transactions:monthTransactions,totalIncome:totalIncomeMonth,totalExpense:totalExpenseMonth,balance:diff});
-
-// مسح العمليات الحالية
-transactions=[];
-
-// إضافة الرصيد المتبقي تلقائياً
-const nextDate = new Date(); nextDate.setMonth(nextDate.getMonth()+1);
-if(diff>0){
-transactions.push({type:'income',category:'رصيد متبقي',desc:`رصيد متبقي من الشهر ${m}/${y}`,amount:diff,date:nextDate.toLocaleDateString('ar-EG')});
-} else if(diff<0){
-transactions.push({type:'expense',category:'رصيد باقي',desc:`رصيد باقي من الشهر ${m}/${y}`,amount:Math.abs(diff),date:nextDate.toLocaleDateString('ar-EG')});
-}
-
-localStorage.setItem('financeData',JSON.stringify(transactions));
-localStorage.setItem('archiveData',JSON.stringify(archiveData));
-updateArchiveSelect();
-renderTransactions();
-alert(`تم ترحيل الشهر بنجاح!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\nالرصيد: ${diff}`);
 }
 
 /* ===== الترحيل اللحظي ===== */
