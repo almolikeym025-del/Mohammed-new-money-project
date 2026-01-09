@@ -19,9 +19,10 @@ table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{border-bottom:1px solid #ddd;padding:8px;text-align:center}
 th{background:#f5f5f5}
 .summary{display:flex;gap:10px;flex-wrap:wrap}
-.box{flex:1;padding:10px;border-radius:10px;text-align:center}
-.income{color:#2e7d32;font-weight:bold;background:#e3f2fd}
-.expense{color:#c62828;font-weight:bold;background:#ffeaea}
+.box{flex:1;padding:10px;border-radius:10px;text-align:center;font-weight:bold;}
+.income{background:#e3f2fd;color:#2e7d32;}
+.expense{background:#ffeaea;color:#c62828;}
+.balance{color:#000;background:#fff;}
 .warning{background:#fff3e0}
 .actionBtn{margin:2px;padding:4px 8px;font-size:14px;border-radius:6px;}
 .editBtn{background:#ffb300;}
@@ -77,9 +78,9 @@ th{background:#f5f5f5}
 </div>
 
 <div class="summary">
-<div class="box income">الدخل<br><span id="totalIncome">0</span></div>
-<div class="box expense">الخرج<br><span id="totalExpense">0</span></div>
-<div class="box">الرصيد<br><span id="balance">0</span></div>
+<div id="totalIncomeBox" class="box income">الدخل<br><span id="totalIncome">0</span></div>
+<div id="totalExpenseBox" class="box expense">الخرج<br><span id="totalExpense">0</span></div>
+<div id="balanceBox" class="box balance">الرصيد<br><span id="balance">0</span></div>
 </div>
 
 <button onclick="exportFinancePDF()">تصدير كشف العمليات PDF</button>
@@ -196,13 +197,13 @@ t.type==='income'?inc+=t.amount:exp+=t.amount;
 });
 
 // الملخص المالي بالألوان
-totalIncome.textContent=inc; totalIncome.style.color='#2e7d32';
-totalExpense.textContent=exp; totalExpense.style.color='#c62828';
+totalIncome.textContent=inc; totalIncomeBox.style.color='#2e7d32';
+totalExpense.textContent=exp; totalExpenseBox.style.color='#c62828';
 const bal = inc-exp;
 balance.textContent=bal;
-if(bal>0) balance.style.color='#2e7d32';
-else if(bal<0) balance.style.color='#c62828';
-else balance.style.color='#000';
+if(bal>0) balanceBox.style.color='#2e7d32';
+else if(bal<0) balanceBox.style.color='#c62828';
+else balanceBox.style.color='#000';
 }
 
 /* ===== حفظ ===== */
@@ -211,40 +212,18 @@ localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
 
-/* ===== الديون مع تسجيل العمليات تلقائيًا ===== */
+/* ===== الديون ===== */
 function addDebt(){
-  if(!debtor.value || debtAmount.value<=0) return;
-  const newDebt = {
-    debtor: debtor.value,
-    amount: +debtAmount.value,
-    type: debtType.value, // owedToYou أو youOwe
-    date: new Date().toLocaleDateString('ar-EG')
-  };
-  debtData.push(newDebt);
-  localStorage.setItem('debtData', JSON.stringify(debtData));
-
-  // تسجيل العملية تلقائياً حسب نوع الدين
-  if(newDebt.type === 'youOwe'){ // أنت مدين → دخل
-    transactions.push({
-      type: 'income',
-      category: 'دين',
-      desc: `أخذت مبلغ من ${newDebt.debtor}`,
-      amount: newDebt.amount,
-      date: new Date().toLocaleDateString('ar-EG')
-    });
-  } else { // مدين لك → خرج
-    transactions.push({
-      type: 'expense',
-      category: 'دين',
-      desc: `${newDebt.debtor} مدين لك`,
-      amount: newDebt.amount,
-      date: new Date().toLocaleDateString('ar-EG')
-    });
-  }
-
-  saveTransactions();
-  debtor.value=''; debtAmount.value='';
-  renderDebts();
+if(!debtor.value || debtAmount.value<=0) return;
+debtData.push({
+debtor:debtor.value,
+amount:+debtAmount.value,
+type:debtType.value,
+date:new Date().toLocaleDateString('ar-EG')
+});
+localStorage.setItem('debtData',JSON.stringify(debtData));
+debtor.value=''; debtAmount.value='';
+renderDebts();
 }
 
 function renderDebts(){
@@ -265,31 +244,29 @@ debtList.innerHTML+=`
 });
 }
 
-/* ===== زر السداد يبقى كما في السابق ===== */
 function payDebt(i){
-  const d = debtData[i];
-  const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
-  if(payAmount!==null && !isNaN(payAmount)){
-      const paid = +payAmount;
-      if(paid >= d.amount){
-          if(d.type==='owedToYou'){
-              transactions.push({type:'income', category:'سداد ديون', desc:`سداد كامل ${d.debtor}`, amount:d.amount, date:new Date().toLocaleDateString('ar-EG')});
-          } else {
-              transactions.push({type:'expense', category:'ديون مسددة', desc:`سداد كامل دين لـ ${d.debtor}`, amount:d.amount, date:new Date().toLocaleDateString('ar-EG')});
-          }
-          debtData.splice(i,1);
-      } else {
-          d.amount -= paid;
-          if(d.type==='owedToYou'){
-              transactions.push({type:'income', category:'سداد ديون', desc:`سداد جزئي ${d.debtor}`, amount:paid, date:new Date().toLocaleDateString('ar-EG')});
-          } else {
-              transactions.push({type:'expense', category:'ديون مسددة', desc:`سداد جزئي دين لـ ${d.debtor}`, amount:paid, date:new Date().toLocaleDateString('ar-EG')});
-          }
-      }
-      localStorage.setItem('debtData', JSON.stringify(debtData));
-      saveTransactions();
-      renderDebts();
-  }
+const d = debtData[i];
+const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
+if(payAmount!==null && !isNaN(payAmount)){
+    if(+payAmount >= d.amount){
+        if(d.type==='owedToYou'){
+            transactions.push({type:'income',category:'سداد ديون',desc:`سداد ${d.debtor}`,amount:d.amount,date:new Date().toLocaleDateString('ar-EG')});
+        } else {
+            transactions.push({type:'expense',category:'ديون مسددة',desc:`سداد دين لـ ${d.debtor}`,amount:d.amount,date:new Date().toLocaleDateString('ar-EG')});
+        }
+        debtData.splice(i,1);
+    } else {
+        d.amount -= +payAmount;
+        if(d.type==='owedToYou'){
+            transactions.push({type:'income',category:'سداد ديون',desc:`سداد ${d.debtor}`,amount:+payAmount,date:new Date().toLocaleDateString('ar-EG')});
+        } else {
+            transactions.push({type:'expense',category:'ديون مسددة',desc:`سداد دين لـ ${d.debtor}`,amount:+payAmount,date:new Date().toLocaleDateString('ar-EG')});
+        }
+    }
+    localStorage.setItem('debtData',JSON.stringify(debtData));
+    saveTransactions();
+    renderDebts();
+}
 }
 
 /* ===== الترحيل اللحظي ===== */
@@ -315,7 +292,7 @@ renderTransactions();
 alert(`تم الترحيل اللحظي!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\nالرصيد: ${diff}`);
 }
 
-/* ===== PDF عربي ===== */
+/* ===== تحميل الخط العربي ===== */
 async function loadFontArabic(doc){
   try{
     const fontUrl='NotoNaskhArabic-Regular.ttf';
@@ -330,6 +307,7 @@ async function loadFontArabic(doc){
   } catch(e){ alert('خطأ في تحميل الخط العربي'); }
 }
 
+/* ===== PDF عربي - العمليات ===== */
 async function exportFinancePDF(){
 const { jsPDF }=window.jspdf;
 const doc=new jsPDF('p','pt','a4');
@@ -343,10 +321,49 @@ body:transactions.map(t=>[t.date,t.type==='income'?'دخل':'خرج',t.category,
 styles:{font:'arabic',halign:'right'}
 });
 const finalY=doc.lastAutoTable.finalY+20;
-doc.text(`الدخل: ${totalIncome.textContent}`,40,finalY);
-doc.text(`الخرج: ${totalExpense.textContent}`,150,finalY);
-doc.text(`الرصيد: ${balance.textContent}`,280,finalY);
+doc.text(`الدخل: ${totalIncome.textContent}`, 40, finalY);
+doc.text(`الخرج: ${totalExpense.textContent}`, 150, finalY);
+doc.text(`الرصيد: ${balance.textContent}`, 280, finalY);
 doc.save('العمليات.pdf');
+}
+
+/* ===== PDF عربي - الديون ===== */
+async function exportDebtPDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    await loadFontArabic(doc);
+    doc.setFontSize(16);
+    doc.text('كشف الديون', 40, 40);
+    doc.autoTable({
+        startY:60,
+        head:[['التاريخ','الاسم','النوع','المبلغ']],
+        body: debtData.map(d=>[d.date,d.debtor,d.type==='owedToYou'?'مدين لك':'أنت مدين',d.amount]),
+        styles:{font:'arabic',halign:'right'}
+    });
+    doc.save('الديون.pdf');
+}
+
+/* ===== PDF عربي - الأرشيف ===== */
+async function exportArchivePDF(){
+    const i = archiveSelect.value;
+    if(i==='') return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    await loadFontArabic(doc);
+    const a = archiveData[i];
+    doc.setFontSize(16);
+    doc.text(`مصروفات ${a.month}/${a.year}`, 40, 40);
+    doc.autoTable({
+        startY:60,
+        head:[['التاريخ','الفئة','الوصف','المبلغ']],
+        body: a.transactions.map(t=>[t.date,t.category,t.desc,t.amount]),
+        styles:{font:'arabic',halign:'right'}
+    });
+    const finalY=doc.lastAutoTable.finalY+20;
+    doc.text(`الدخل: ${a.totalIncome}`, 40, finalY);
+    doc.text(`المصروف: ${a.totalExpense}`, 150, finalY);
+    doc.text(`الرصيد: ${a.balance}`, 280, finalY);
+    doc.save(`ارشيف_${a.month}_${a.year}.pdf`);
 }
 
 /* ===== الأرشيف ===== */
@@ -376,32 +393,10 @@ updateArchiveSelect();
 archiveList.innerHTML='';
 }
 
-/* ===== تحقق الترحيل الشهري التلقائي عند تحميل الصفحة ===== */
-function autoCloseMonthIfNeeded(){
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    const pendingTransactions = transactions.filter(t => {
-        const tDate = new Date(t.date);
-        const tMonth = tDate.getMonth() + 1;
-        const tYear = tDate.getFullYear();
-        return (tYear < currentYear) || (tYear === currentYear && tMonth < currentMonth);
-    });
-    if(pendingTransactions.length > 0){
-        const tempTransactions = [...transactions];
-        transactions = pendingTransactions;
-        instantClear(); // استخدمنا الترحيل اللحظي ليحسب الأرشيف
-        transactions = tempTransactions.filter(t => !pendingTransactions.includes(t));
-        saveTransactions();
-    }
-}
-
 /* ===== تحميل عند التشغيل ===== */
-autoCloseMonthIfNeeded();
 renderTransactions();
 renderDebts();
 updateArchiveSelect();
-
 </script>
 </body>
 </html>
