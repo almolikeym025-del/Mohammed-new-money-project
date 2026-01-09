@@ -108,7 +108,6 @@ th{background:#f5f5f5}
 
 <button onclick="exportDebtPDF()">تصدير كشف الديون PDF</button>
 </div>
-
 <!-- الأرشيف -->
 <div id="archive" style="display:none">
 
@@ -226,19 +225,46 @@ renderTransactions();
 
 /* ===== الديون ===== */
 function addDebt(){
-if(!debtor.value || debtAmount.value<=0) return;
-debtData.push({
-debtor:debtor.value,
-amount:+debtAmount.value,
-type:debtType.value,
-date:new Date().toLocaleDateString('ar-EG')
-});
-localStorage.setItem('debtData',JSON.stringify(debtData));
-debtor.value=''; debtAmount.value='';
-renderDebts();
-}
+    if(!debtor.value || debtAmount.value<=0) return;
 
-function renderDebts(){
+    const newDebt = {
+        debtor: debtor.value,
+        amount: +debtAmount.value,
+        type: debtType.value,
+        date: new Date().toLocaleDateString('ar-EG')
+    };
+    } else { 
+        // أنت مدين لشخص → خرج
+        transactions.push({
+            type: 'expense',
+            category: 'دين',
+            desc: `دين مستحق على ${newDebt.debtor}`,
+            amount: newDebt.amount,
+            date: new Date().toLocaleDateString('ar-EG')
+        });
+    }
+
+    localStorage.setItem('debtData', JSON.stringify(debtData));
+    localStorage.setItem('financeData', JSON.stringify(transactions));
+
+    renderDebts();
+    renderTransactions();
+
+    debtor.value=''; debtAmount.value='';
+  }
+    debtData.push(newDebt);
+
+    // إضافة العملية تلقائياً في جدول العمليات بفئة "دين"
+    if(newDebt.type === 'owedToYou'){ 
+        // شخص مدين لك → دخل
+        transactions.push({
+            type: 'income',
+            category: 'دين',
+            desc: `دين مستحق من ${newDebt.debtor}`,
+            amount: newDebt.amount,
+            date: new Date().toLocaleDateString('ar-EG')
+        });
+      function renderDebts(){
 debtList.innerHTML='';
 debtData.forEach((d,i)=>{
 debtList.innerHTML+=`
@@ -248,8 +274,6 @@ debtList.innerHTML+=`
 <td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td>
 <td>${d.date}</td>
 <td>
-<button class="actionBtn editBtn" onclick="editDebt(${i})">تعديل</button>
-<button class="actionBtn deleteBtn" onclick="deleteDebt(${i})">حذف</button>
 <button class="actionBtn payBtn" onclick="payDebt(${i})">سداد</button>
 </td>
 </tr>`;
@@ -260,27 +284,39 @@ function payDebt(i){
 const d = debtData[i];
 const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
 if(payAmount!==null && !isNaN(payAmount)){
-    if(+payAmount >= d.amount){
-        if(d.type==='owedToYou'){
-            transactions.push({type:'income',category:'سداد ديون',desc:`سداد ${d.debtor}`,amount:d.amount,date:new Date().toLocaleDateString('ar-EG')});
-        } else {
-            transactions.push({type:'expense',category:'ديون مسددة',desc:`سداد دين لـ ${d.debtor}`,amount:d.amount,date:new Date().toLocaleDateString('ar-EG')});
-        }
+    const paid = +payAmount;
+    // إضافة العملية عند السداد
+    if(d.type==='owedToYou'){ 
+        transactions.push({
+          type:'income',
+          category:'سداد ديون',
+          desc:`سداد ${d.debtor}`,
+          amount:paid,
+          date:new Date().toLocaleDateString('ar-EG')
+        });
+    } else {
+        transactions.push({
+          type:'expense',
+          category:'ديون مسددة',
+          desc:`سداد دين لـ ${d.debtor}`,
+          amount:paid,
+          date:new Date().toLocaleDateString('ar-EG')
+        });
+    }
+if(paid >= d.amount){
         debtData.splice(i,1);
     } else {
-        d.amount -= +payAmount;
-        if(d.type==='owedToYou'){
-            transactions.push({type:'income',category:'سداد ديون',desc:`سداد ${d.debtor}`,amount:+payAmount,date:new Date().toLocaleDateString('ar-EG')});
-        } else {
-            transactions.push({type:'expense',category:'ديون مسددة',desc:`سداد دين لـ ${d.debtor}`,amount:+payAmount,date:new Date().toLocaleDateString('ar-EG')});
-        }
+        d.amount -= paid;
     }
+
     localStorage.setItem('debtData',JSON.stringify(debtData));
-    saveTransactions();
+    localStorage.setItem('financeData',JSON.stringify(transactions));
     renderDebts();
+    renderTransactions();
 }
 }
 
+      
 /* ===== الترحيل اللحظي ===== */
 function instantClear(){
 if(transactions.length===0) return;
