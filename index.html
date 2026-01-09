@@ -183,7 +183,6 @@ transactionList.innerHTML+=`
 <td>${t.date}</td>
 <td>
 <button class="actionBtn editBtn" onclick="editTransaction(${index})">تعديل</button>
-<button class="actionBtn deleteBtn" onclick="deleteTransaction(${index})">حذف</button>
 </td>
 </tr>`;
 t.type==='income'?inc+=t.amount:exp+=t.amount;
@@ -204,13 +203,6 @@ const newDesc = prompt("تعديل الوصف:", t.desc);
 if(newDesc!==null) t.desc=newDesc;
 const newAmount = prompt("تعديل المبلغ:", t.amount);
 if(newAmount!==null && !isNaN(newAmount)) t.amount=+newAmount;
-localStorage.setItem('financeData',JSON.stringify(transactions));
-renderTransactions();
-}
-
-function deleteTransaction(i){
-if(!confirm('هل تريد حذف هذه العملية؟')) return;
-transactions.splice(i,1);
 localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
