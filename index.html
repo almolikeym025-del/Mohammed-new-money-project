@@ -184,7 +184,7 @@ saveTransactions();
 function renderTransactions(){
 transactionList.innerHTML='';
 let inc=0,exp=0;
-transactions.forEach((t)=>{
+transactions.forEach((t,index)=>{
 transactionList.innerHTML+=`
 <tr>
 <td>${t.type==='income'?'دخل':'خرج'}</td>
@@ -192,10 +192,12 @@ transactionList.innerHTML+=`
 <td>${t.desc}</td>
 <td>${t.amount}</td>
 <td>${t.date}</td>
+<td>
+<button class="actionBtn editBtn" onclick="editTransaction(${index})">تعديل</button>
+</td>
 </tr>`;
 t.type==='income'?inc+=t.amount:exp+=t.amount;
 });
-
 // الملخص المالي بالألوان
 totalIncome.textContent=inc; totalIncomeBox.style.color='#2e7d32';
 totalExpense.textContent=exp; totalExpenseBox.style.color='#c62828';
