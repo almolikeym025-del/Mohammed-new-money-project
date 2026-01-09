@@ -211,18 +211,40 @@ localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
 
-/* ===== الديون ===== */
+/* ===== الديون مع تسجيل العمليات تلقائيًا ===== */
 function addDebt(){
-if(!debtor.value || debtAmount.value<=0) return;
-debtData.push({
-debtor:debtor.value,
-amount:+debtAmount.value,
-type:debtType.value,
-date:new Date().toLocaleDateString('ar-EG')
-});
-localStorage.setItem('debtData',JSON.stringify(debtData));
-debtor.value=''; debtAmount.value='';
-renderDebts();
+  if(!debtor.value || debtAmount.value<=0) return;
+  const newDebt = {
+    debtor: debtor.value,
+    amount: +debtAmount.value,
+    type: debtType.value, // owedToYou أو youOwe
+    date: new Date().toLocaleDateString('ar-EG')
+  };
+  debtData.push(newDebt);
+  localStorage.setItem('debtData', JSON.stringify(debtData));
+
+  // تسجيل العملية تلقائياً حسب نوع الدين
+  if(newDebt.type === 'youOwe'){ // أنت مدين → دخل
+    transactions.push({
+      type: 'income',
+      category: 'دين',
+      desc: `أخذت مبلغ من ${newDebt.debtor}`,
+      amount: newDebt.amount,
+      date: new Date().toLocaleDateString('ar-EG')
+    });
+  } else { // مدين لك → خرج
+    transactions.push({
+      type: 'expense',
+      category: 'دين',
+      desc: `${newDebt.debtor} مدين لك`,
+      amount: newDebt.amount,
+      date: new Date().toLocaleDateString('ar-EG')
+    });
+  }
+
+  saveTransactions();
+  debtor.value=''; debtAmount.value='';
+  renderDebts();
 }
 
 function renderDebts(){
@@ -243,29 +265,31 @@ debtList.innerHTML+=`
 });
 }
 
+/* ===== زر السداد يبقى كما في السابق ===== */
 function payDebt(i){
-const d = debtData[i];
-const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
-if(payAmount!==null && !isNaN(payAmount)){
-    if(+payAmount >= d.amount){
-        if(d.type==='owedToYou'){
-            transactions.push({type:'income',category:'سداد ديون',desc:`سداد ${d.debtor}`,amount:d.amount,date:new Date().toLocaleDateString('ar-EG')});
-        } else {
-            transactions.push({type:'expense',category:'ديون مسددة',desc:`سداد دين لـ ${d.debtor}`,amount:d.amount,date:new Date().toLocaleDateString('ar-EG')});
-        }
-        debtData.splice(i,1);
-    } else {
-        d.amount -= +payAmount;
-        if(d.type==='owedToYou'){
-            transactions.push({type:'income',category:'سداد ديون',desc:`سداد ${d.debtor}`,amount:+payAmount,date:new Date().toLocaleDateString('ar-EG')});
-        } else {
-            transactions.push({type:'expense',category:'ديون مسددة',desc:`سداد دين لـ ${d.debtor}`,amount:+payAmount,date:new Date().toLocaleDateString('ar-EG')});
-        }
-    }
-    localStorage.setItem('debtData',JSON.stringify(debtData));
-    saveTransactions();
-    renderDebts();
-}
+  const d = debtData[i];
+  const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
+  if(payAmount!==null && !isNaN(payAmount)){
+      const paid = +payAmount;
+      if(paid >= d.amount){
+          if(d.type==='owedToYou'){
+              transactions.push({type:'income', category:'سداد ديون', desc:`سداد كامل ${d.debtor}`, amount:d.amount, date:new Date().toLocaleDateString('ar-EG')});
+          } else {
+              transactions.push({type:'expense', category:'ديون مسددة', desc:`سداد كامل دين لـ ${d.debtor}`, amount:d.amount, date:new Date().toLocaleDateString('ar-EG')});
+          }
+          debtData.splice(i,1);
+      } else {
+          d.amount -= paid;
+          if(d.type==='owedToYou'){
+              transactions.push({type:'income', category:'سداد ديون', desc:`سداد جزئي ${d.debtor}`, amount:paid, date:new Date().toLocaleDateString('ar-EG')});
+          } else {
+              transactions.push({type:'expense', category:'ديون مسددة', desc:`سداد جزئي دين لـ ${d.debtor}`, amount:paid, date:new Date().toLocaleDateString('ar-EG')});
+          }
+      }
+      localStorage.setItem('debtData', JSON.stringify(debtData));
+      saveTransactions();
+      renderDebts();
+  }
 }
 
 /* ===== الترحيل اللحظي ===== */
@@ -366,7 +390,7 @@ function autoCloseMonthIfNeeded(){
     if(pendingTransactions.length > 0){
         const tempTransactions = [...transactions];
         transactions = pendingTransactions;
-        closeMonth();
+        instantClear(); // استخدمنا الترحيل اللحظي ليحسب الأرشيف
         transactions = tempTransactions.filter(t => !pendingTransactions.includes(t));
         saveTransactions();
     }
