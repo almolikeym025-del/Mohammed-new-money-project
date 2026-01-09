@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>المدير المالي الشخصي</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e88e5">
+
+<style>
+body{font-family:Tajawal,Arial;background:#f4f6f8;margin:0}
+header{background:#1e88e5;color:#fff;padding:15px;text-align:center;font-size:22px}
+.nav{display:flex}
+.nav button{flex:1;padding:12px;border:none;background:#1565c0;color:#fff}
+.nav button.active{background:#1e88e5}
+.container{padding:15px}
+.card{background:#fff;border-radius:12px;padding:15px;margin-bottom:15px}
+input,select,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #ddd;text-align:center}
+.summary{display:flex;gap:10px}
+.box{flex:1;background:#e3f2fd;padding:10px;border-radius:10px;text-align:center}
+.warningRow{background:#ffebee}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<header>المدير المالي الشخصي</header>
+
+<div class="nav">
+<button class="active" onclick="showPage('finance',this)">العمليات</button>
+<button onclick="showPage('budget',this)">الميزانية</button>
+<button onclick="showPage('charts',this)">التحليل</button>
+<button onclick="showPage('debts',this)">الديون</button>
+<button onclick="showPage('archive',this)">الأرشيف</button>
+</div>
+
+<div class="container">
+
+<!-- العمليات -->
+<div id="finance" class="page">
+<div class="card">
+<select id="type"><option value="income">دخل</option><option value="expense">مصروف</option></select>
+<select id="category">
+<option>راتب</option><option>إيجار</option><option>طعام</option>
+<option>مواصلات</option><option>تسوق</option><option>فواتير</option>
+</select>
+<input id="desc" placeholder="الوصف">
+<input id="amount" type="number" placeholder="المبلغ">
+<button onclick="addTransaction()">إضافة</button>
+</div>
+
+<div class="card">
+<table>
+<thead><tr><th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th></tr></thead>
+<tbody id="transactionList"></tbody>
+</table>
+</div>
+
+<div class="summary">
+<div class="box">الدخل<br><span id="totalIncome">0</span></div>
+<div class="box">المصروف<br><span id="totalExpense">0</span></div>
+<div class="box">الرصيد<br><span id="balance">0</span></div>
+</div>
+
+<button onclick="closeMonth()">ترحيل الشهر</button>
+</div>
+
+<!-- الميزانية -->
+<div id="budget" class="page" style="display:none">
+<div class="card">
+<select id="budgetCategory">
+<option>طعام</option><option>إيجار</option><option>مواصلات</option>
+<option>تسوق</option><option>فواتير</option>
+</select>
+<input id="budgetAmount" type="number" placeholder="قيمة الميزانية">
+<button onclick="setBudget()">حفظ الميزانية</button>
+</div>
+</div>
+
+<!-- التحليل -->
+<div id="charts" class="page" style="display:none">
+<div class="card">
+<canvas id="incomeExpenseChart"></canvas>
+<br>
+<canvas id="categoryChart"></canvas>
+</div>
+</div>
+
+<!-- الديون -->
+<div id="debts" class="page" style="display:none">
+<div class="card">
+<input id="debtor" placeholder="الاسم">
+<input id="debtAmount" type="number" placeholder="المبلغ">
+<select id="debtType">
+<option value="owedToYou">مدين لك</option>
+<option value="youOwe">أنت مدين</option>
+</select>
+<button onclick="addDebt()">إضافة دين</button>
+</div>
+
+<div class="card">
+<table>
+<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>إجراء</th></tr></thead>
+<tbody id="debtList"></tbody>
+</table>
+</div>
+</div>
+
+<!-- الأرشيف -->
+<div id="archive" class="page" style="display:none">
+<div class="card">
+<select id="archiveSelect" onchange="renderArchive()">
+<option value="">اختر شهر</option>
+</select>
+</div>
+
+<div class="card">
+<table>
+<thead><tr><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th></tr></thead>
+<tbody id="archiveList"></tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+<script>
+let transactions=JSON.parse(localStorage.getItem('financeData'))||[];
+let debts=JSON.parse(localStorage.getItem('debtData'))||[];
+let budgets=JSON.parse(localStorage.getItem('budgets'))||{};
+let archiveData=JSON.parse(localStorage.getItem('archiveData'))||[];
+let chart1,chart2;
+
+function showPage(id,btn){
+document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+document.getElementById(id).style.display='block';
+document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+}
+
+function addTransaction(){
+if(!desc.value||amount.value<=0)return;
+transactions.push({
+type:type.value,category:category.value,desc:desc.value,
+amount:+amount.value,date:new Date().toLocaleDateString('ar-EG')
+});
+save();
+}
+
+function render(){
+transactionList.innerHTML='';
+let inc=0,exp=0,catSum={};
+transactions.forEach(t=>{
+if(t.type==='income')inc+=t.amount;
+else{exp+=t.amount;catSum[t.category]=(catSum[t.category]||0)+t.amount;}
+transactionList.innerHTML+=`
+<tr>
+<td>${t.type==='income'?'دخل':'مصروف'}</td>
+<td>${t.category}</td>
+<td>${t.desc}</td>
+<td>${t.amount}</td>
+<td>${t.date}</td>
+</tr>`;
+});
+totalIncome.textContent=inc;
+totalExpense.textContent=exp;
+balance.textContent=inc-exp;
+drawCharts(inc,exp,catSum);
+}
+
+function closeMonth(){
+const now=new Date();
+archiveData.push({
+month:now.getMonth()+1,
+year:now.getFullYear(),
+transactions:[...transactions]
+});
+transactions=[];
+save();
+updateArchive();
+}
+
+function updateArchive(){
+archiveSelect.innerHTML='<option value="">اختر شهر</option>';
+archiveData.forEach((a,i)=>{
+archiveSelect.innerHTML+=`<option value="${i}">${a.month}/${a.year}</option>`;
+});
+}
+
+function renderArchive(){
+archiveList.innerHTML='';
+const a=archiveData[archiveSelect.value];
+if(!a)return;
+a.transactions.forEach(t=>{
+archiveList.innerHTML+=`
+<tr><td>${t.category}</td><td>${t.desc}</td><td>${t.amount}</td><td>${t.date}</td></tr>`;
+});
+}
+
+function setBudget(){
+budgets[budgetCategory.value]=+budgetAmount.value;
+localStorage.setItem('budgets',JSON.stringify(budgets));
+}
+
+function drawCharts(inc,exp,catSum){
+if(chart1)chart1.destroy();
+if(chart2)chart2.destroy();
+chart1=new Chart(incomeExpenseChart,{type:'bar',data:{labels:['دخل','مصروف'],datasets:[{data:[inc,exp]}]}});
+chart2=new Chart(categoryChart,{type:'pie',data:{labels:Object.keys(catSum),datasets:[{data:Object.values(catSum)}]}});
+}
+
+function addDebt(){
+debts.push({name:debtor.value,amount:+debtAmount.value,type:debtType.value});
+save();
+renderDebts();
+}
+
+function renderDebts(){
+debtList.innerHTML='';
+debts.forEach((d,i)=>{
+debtList.innerHTML+=`
+<tr><td>${d.name}</td><td>${d.amount}</td>
+<td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td>
+<td><button onclick="payDebt(${i})">سداد</button></td></tr>`;
+});
+}
+
+function payDebt(i){
+const d=debts[i];
+transactions.push({
+type:d.type==='youOwe'?'expense':'income',
+category:'سداد دين',
+desc:`سداد ${d.name}`,
+amount:d.amount,
+date:new Date().toLocaleDateString('ar-EG')
+});
+debts.splice(i,1);
+save();
+renderDebts();
+}
+
+function save(){
+localStorage.setItem('financeData',JSON.stringify(transactions));
+localStorage.setItem('debtData',JSON.stringify(debts));
+localStorage.setItem('archiveData',JSON.stringify(archiveData));
+render();
+}
+
+render();renderDebts();updateArchive();
+</script>
+
+<script>
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('sw.js');
+}
+</script>
+
+</body>
+</html>
