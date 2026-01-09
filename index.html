@@ -19,9 +19,9 @@ table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{border-bottom:1px solid #ddd;padding:8px;text-align:center}
 th{background:#f5f5f5}
 .summary{display:flex;gap:10px;flex-wrap:wrap}
-.box{flex:1;background:#e3f2fd;padding:10px;border-radius:10px;text-align:center}
-.income{color:#2e7d32;font-weight:bold}
-.expense{color:#c62828;font-weight:bold}
+.box{flex:1;padding:10px;border-radius:10px;text-align:center}
+.income{color:#2e7d32;font-weight:bold;background:#e3f2fd}
+.expense{color:#c62828;font-weight:bold;background:#ffeaea}
 .warning{background:#fff3e0}
 .actionBtn{margin:2px;padding:4px 8px;font-size:14px;border-radius:6px;}
 .editBtn{background:#ffb300;}
@@ -63,7 +63,7 @@ th{background:#f5f5f5}
 
 <div class="card warning">
 <h4>تصفية وترحيل المصروفات والدخل</h4>
-<p>يمكنك ترحيل العمليات الشهرية أو اللحظية وحساب الفارق.</p>
+<p>يمكنك ترحيل العمليات الشهرية تلقائيًا أو لحظيًا يدويًا.</p>
 <button onclick="closeMonth()">ترحيل الشهر</button>
 <button onclick="instantClear()">ترحيل لحظي</button>
 </div>
@@ -269,17 +269,14 @@ if(payAmount!==null && !isNaN(payAmount)){
 }
 }
 
-/* ===== ترحيل الشهر مع الرصيد ===== */
+/* ===== ترحيل الشهر ===== */
 function closeMonth(){
-if(!confirm('هل تريد ترحيل كل العمليات وحساب الفارق؟')) return;
-
+if(transactions.length===0) return;
 const now = new Date();
 const m = now.getMonth()+1;
 const y = now.getFullYear();
 
 const monthTransactions = [...transactions];
-if(monthTransactions.length===0) return alert('لا توجد عمليات لترحيلها لهذا الشهر');
-
 let totalIncomeMonth=0, totalExpenseMonth=0;
 monthTransactions.forEach(t=>{
 if(t.type==='income') totalIncomeMonth+=t.amount;
@@ -293,25 +290,45 @@ archiveData.push({month:m,year:y,transactions:monthTransactions,totalIncome:tota
 // مسح العمليات الحالية
 transactions=[];
 
-// إضافة الرصيد المتبقي للشهر التالي
-if(diff!==0){
+// إضافة الرصيد المتبقي تلقائياً
 const nextDate = new Date(); nextDate.setMonth(nextDate.getMonth()+1);
 if(diff>0){
 transactions.push({type:'income',category:'رصيد متبقي',desc:`رصيد متبقي من الشهر ${m}/${y}`,amount:diff,date:nextDate.toLocaleDateString('ar-EG')});
-} else {
+} else if(diff<0){
 transactions.push({type:'expense',category:'رصيد باقي',desc:`رصيد باقي من الشهر ${m}/${y}`,amount:Math.abs(diff),date:nextDate.toLocaleDateString('ar-EG')});
-}
 }
 
 localStorage.setItem('financeData',JSON.stringify(transactions));
 localStorage.setItem('archiveData',JSON.stringify(archiveData));
 updateArchiveSelect();
 renderTransactions();
-
 alert(`تم ترحيل الشهر بنجاح!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\nالرصيد: ${diff}`);
 }
 
-/* ===== تصدير PDF مع الملخص ===== */
+/* ===== الترحيل اللحظي ===== */
+function instantClear(){
+if(transactions.length===0) return;
+let totalIncomeMonth=0,totalExpenseMonth=0;
+transactions.forEach(t=>{if(t.type==='income') totalIncomeMonth+=t.amount; else totalExpenseMonth+=t.amount;});
+const diff = totalIncomeMonth - totalExpenseMonth;
+
+archiveData.push({month:new Date().getMonth()+1,year:new Date().getFullYear(),transactions:[...transactions],totalIncome:totalIncomeMonth,totalExpense:totalExpenseMonth,balance:diff});
+
+transactions=[];
+
+// إضافة الرصيد المتبقي
+const nextDate=new Date(); nextDate.setMonth(nextDate.getMonth()+1);
+if(diff>0) transactions.push({type:'income',category:'رصيد متبقي',desc:`رصيد متبقي من الترحيل اللحظي`,amount:diff,date:nextDate.toLocaleDateString('ar-EG')});
+else if(diff<0) transactions.push({type:'expense',category:'رصيد باقي',desc:`رصيد باقي من الترحيل اللحظي`,amount:Math.abs(diff),date:nextDate.toLocaleDateString('ar-EG')});
+
+localStorage.setItem('financeData',JSON.stringify(transactions));
+localStorage.setItem('archiveData',JSON.stringify(archiveData));
+updateArchiveSelect();
+renderTransactions();
+alert(`تم الترحيل اللحظي!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\nالرصيد: ${diff}`);
+}
+
+/* ===== PDF عربي ===== */
 async function loadFontArabic(doc){
   try{
     const fontUrl='NotoNaskhArabic-Regular.ttf';
@@ -364,7 +381,6 @@ archiveList.innerHTML+=`<tr><td>${t.category}</td><td>${t.desc}</td><td>${t.amou
 archiveList.innerHTML+=`<tr><td colspan="4">الدخل: ${a.totalIncome} | المصروف: ${a.totalExpense} | الرصيد: ${a.balance}</td></tr>`;
 }
 
-/* ===== حذف الأرشيف ===== */
 function clearArchive(){
 if(!confirm('هل تريد حذف كل الأرشيف؟')) return;
 archiveData=[];
@@ -373,11 +389,32 @@ updateArchiveSelect();
 archiveList.innerHTML='';
 }
 
+/* ===== تحقق الترحيل الشهري التلقائي عند تحميل الصفحة ===== */
+function autoCloseMonthIfNeeded(){
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const pendingTransactions = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        const tMonth = tDate.getMonth() + 1;
+        const tYear = tDate.getFullYear();
+        return (tYear < currentYear) || (tYear === currentYear && tMonth < currentMonth);
+    });
+    if(pendingTransactions.length > 0){
+        const tempTransactions = [...transactions];
+        transactions = pendingTransactions;
+        closeMonth();
+        transactions = tempTransactions.filter(t => !pendingTransactions.includes(t));
+        saveTransactions();
+    }
+}
+
 /* ===== تحميل عند التشغيل ===== */
+autoCloseMonthIfNeeded();
 renderTransactions();
 renderDebts();
 updateArchiveSelect();
-</script>
 
+</script>
 </body>
 </html>
