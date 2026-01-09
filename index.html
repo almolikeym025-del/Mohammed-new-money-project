@@ -25,6 +25,8 @@ th{background:#f5f5f5}
 .balance{color:#000;background:#fff;}
 .warning{background:#fff3e0}
 .actionBtn{margin:2px;padding:4px 8px;font-size:14px;border-radius:6px;}
+.editBtn{background:#ffb300;}
+.deleteBtn{background:#c62828;}
 .payBtn{background:#2e7d32;}
 </style>
 
@@ -99,7 +101,7 @@ th{background:#f5f5f5}
 
 <div class="card">
 <table>
-<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th><th>الإجراء</th></tr></thead>
+<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th><th>الإجراءات</th></tr></thead>
 <tbody id="debtList"></tbody>
 </table>
 </div>
@@ -204,19 +206,6 @@ else if(bal<0) balanceBox.style.color='#c62828';
 else balanceBox.style.color='#000';
 }
 
-/* ===== تحرير وحذف العمليات ===== */
-  function editTransaction(i){
-const t = transactions[i];
-const newDesc = prompt("تعديل الوصف:", t.desc);
-if(newDesc!==null) t.desc=newDesc;
-const newAmount = prompt("تعديل المبلغ:", t.amount);
-if(newAmount!==null && !isNaN(newAmount)) t.amount=+newAmount;
-localStorage.setItem('financeData',JSON.stringify(transactions));
-renderTransactions();
-}
-
-
-
 /* ===== حفظ ===== */
 function saveTransactions(){
 localStorage.setItem('financeData',JSON.stringify(transactions));
@@ -247,13 +236,14 @@ debtList.innerHTML+=`
 <td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td>
 <td>${d.date}</td>
 <td>
+<button class="actionBtn editBtn" onclick="editDebt(${i})">تعديل</button>
+<button class="actionBtn deleteBtn" onclick="deleteDebt(${i})">حذف</button>
 <button class="actionBtn payBtn" onclick="payDebt(${i})">سداد</button>
 </td>
 </tr>`;
 });
 }
 
-/* ===== سداد الدين مع إضافة تلقائية لجدول العمليات ===== */
 function payDebt(i){
 const d = debtData[i];
 const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
